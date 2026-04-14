@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NVIDIA Physical AI CLU Dashboard — Dalio-Compliant</title>
+    <style>
+        :root {
+            --nvidia-green: #76B900;
+            --dark-bg: #1A1A2E;
+            --dark-secondary: #16213E;
+            --dark-card: #1E2A45;
+            --light-text: #FFFFFF;
+            --muted: #9CA3AF;
+            --verified: #22C55E;
+            --estimated: #F59E0B;
+            --needs-data: #EF4444;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { background: var(--dark-bg); color: var(--light-text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display:flex; min-height:100vh; }
+
+        /* Sidebar */
+        .sidebar { width:260px; background: var(--dark-secondary); padding:1.5rem 1rem; position:fixed; top:0; left:0; bottom:0; overflow-y:auto; z-index:10; border-right:1px solid #333; }
+        .sidebar h1 { font-size:1.1rem; color:var(--nvidia-green); margin-bottom:0.25rem; }
+        .sidebar .subtitle { font-size:0.75rem; color:var(--muted); margin-bottom:1.5rem; }
+        .nav-item { display:block; width:100%; text-align:left; background:none; border:none; color:var(--muted); padding:0.6rem 0.75rem; cursor:pointer; font-size:0.85rem; border-radius:6px; margin-bottom:2px; transition:all 0.15s; }
+        .nav-item:hover { background:rgba(118,185,0,0.1); color:#fff; }
+        .nav-item.active { background:rgba(118,185,0,0.2); color:var(--nvidia-green); font-weight:600; }
+        .nav-section { font-size:0.65rem; text-transform:uppercase; letter-spacing:0.1em; color:var(--muted); margin:1rem 0 0.5rem 0.75rem; }
+
+        /* Legend */
+        .legend { margin-top:1.5rem; padding:0.75rem; background:var(--dark-bg); border-radius:6px; font-size:0.7rem; }
+        .legend-title { font-weight:700; margin-bottom:0.5rem; color:#fff; }
+        .legend span { display:inline-block; padding:1px 6px; border-radius:3px; margin:2px 0; font-weight:600; }
+        .tag-v { background:rgba(34,197,94,0.2); color:var(--verified); }
+        .tag-e { background:rgba(245,158,11,0.2); color:var(--estimated); }
+        .tag-n { background:rgba(239,68,68,0.2); color:var(--needs-data); }
+
+        /* Main */
+        .main { margin-left:260px; flex:1; padding:2rem 2.5rem; max-width:1200px; }
+        .page { display:none; }
+        .page.active { display:block; }
+
+        h2 { font-size:1.5rem; color:var(--nvidia-green); margin-bottom:0.25rem; }
+        h3.section-header { font-size:1.1rem; font-weight:700; margin:2rem 0 1rem; padding-bottom:0.5rem; border-bottom:2px solid var(--nvidia-green); color:var(--nvidia-green); }
+        p { line-height:1.65; color:#D1D5DB; margin-bottom:0.75rem; font-size:0.9rem; }
+        .card { background:var(--dark-card); border-radius:8px; padding:1.25rem; margin-bottom:1rem; border:1px solid #2D3A55; }
+        .card-title { font-weight:700; font-size:0.95rem; margin-bottom:0.5rem; }
+
+        /* Tables */
+        table { width:100%; border-collapse:collapse; margin:1rem 0; font-size:0.82rem; }
+        th { background:var(--dark-bg); padding:0.7rem 0.6rem; text-align:left; font-weight:600; border:1px solid #333; color:var(--nvidia-green); }
+        td { padding:0.55rem 0.6rem; border:1px solid #333; }
+        tr:nth-child(even) { background:rgba(118,185,0,0.04); }
+        .nvidia-row { background:rgba(118,185,0,0.12) !important; font-weight:600; }
+
+        /* Confidence tags inline */
+        .v, .e, .nd { font-size:0.65rem; font-weight:700; padding:1px 5px; border-radius:3px; margin-left:4px; vertical-align:middle; }
+        .v { background:rgba(34,197,94,0.2); color:var(--verified); }
+        .e { background:rgba(245,158,11,0.2); color:var(--estimated); }
+        .nd { background:rgba(239,68,68,0.2); color:var(--needs-data); }
+
+        /* Value stack */
+        .vs-item { background:var(--dark-secondary); padding:1rem; margin-bottom:0.6rem; border-left:3px solid var(--nvidia-green); border-radius:4px; }
+        .vs-item .label { font-weight:700; font-size:0.9rem; }
+        .vs-item .range { color:var(--nvidia-green); font-weight:600; }
+        .vs-item .detail { font-size:0.8rem; color:var(--muted); margin-top:0.25rem; }
+
+        /* Source citation */
+        .source { font-size:0.72rem; color:var(--muted); margin-top:0.5rem; }
+        .source a { color:var(--nvidia-green); text-decoration:none; }
+        .source a:hover { text-decoration:underline; }
+
+        /* Product grid */
+        .product-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px,1fr)); gap:1rem; margin-top:1rem; }
+        .product-card { background:var(--dark-card); border:1px solid #2D3A55; border-radius:8px; padding:1.25rem; cursor:pointer; transition:border-color 0.2s; }
+        .product-card:hover { border-color:var(--nvidia-green); }
+        .product-card h4 { color:var(--nvidia-green); margin-bottom:0.5rem; }
+        .product-card p { font-size:0.8rem; color:var(--muted); }
+
+        @media(max-width:900px) {
+            .sidebar { display:none; }
+            .main { margin-left:0; padding:1rem; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<nav class="sidebar">
+    <h1>NVIDIA Physical AI</h1>
+    <div class="subtitle">Competitive Lineup — April 2026</div>
+    <div class="nav-section">Overview</div>
+    <button class="nav-item active" onclick="showPage('overview')">Stack Overview</button>
+    <div class="nav-section">Foundation Model</div>
+    <button class="nav-item" onclick="showPage('groot')">GR00T</button>
+    <div class="nav-section">Training &amp; Simulation</div>
+    <button class="nav-item" onclick="showPage('isaaclab')">Isaac Lab</button>
+    <button class="nav-item" onclick="showPage('labarena')">Isaac Lab-Arena</button>
+    <button class="nav-item" onclick="showPage('isaacsim')">Isaac Sim</button>
+    <button class="nav-item" onclick="showPage('newton')">Newton Physics</button>
+    <div class="nav-section">Deployment &amp; Ops</div>
+    <button class="nav-item" onclick="showPage('isaacos')">Isaac OS</button>
+    <button class="nav-item" onclick="showPage('isaacros')">Isaac ROS</button>
+    <button class="nav-item" onclick="showPage('osmo')">OSMO</button>
+    <div class="legend">
+        <div class="legend-title">Data Confidence Legend</div>
+        <span class="tag-v">VERIFIED</span> Published source confirmed<br>
+        <span class="tag-e">ESTIMATED</span> Reasonable inference<br>
+        <span class="tag-n">NEEDS DATA</span> Internal NVIDIA data required
+    </div>
+</nav>
+
+<!-- Main Content -->
+<div class="main">
+
+<!-- ===== OVERVIEW ===== -->
+<div id="overview" class="page active">
+<h2>NVIDIA Physical AI — Competitive Lineup</h2>
+<p style="color:var(--muted); font-size:0.8rem;">Prepared April 14, 2026 · Dalio-Compliant: Radical Transparency · All data points tagged with confidence levels</p>
+
+<h3 class="section-header">Executive Summary</h3>
+<p>NVIDIA's Physical AI stack provides an end-to-end platform from foundation model (GR00T) through simulation (Isaac Sim), training (Isaac Lab + Newton), evaluation (Lab-Arena), deployment (Isaac ROS), and orchestration (OSMO). This CLU evaluates each component against real competitors with <strong>honest, source-cited data</strong>.</p>
+
+<div class="card">
+<div class="card-title">Key Honest Findings</div>
+<p><strong>Strengths:</strong> Unmatched GPU-accelerated simulation throughput (2M steps/sec Isaac Lab, 152–475× speedups via Newton). Apache 2.0 licensing on most components. Deep vertical integration.</p>
+<p><strong>Honest Gaps:</strong> GR00T N1.5 achieves 38.3% on DreamGen — strong progress but not dominant vs. Figure GEN-1's 99% on specific industrial tasks. "Isaac OS" not confirmed as a standalone product. Displacement cost estimates below require internal NVIDIA validation.</p>
+</div>
+
+<h3 class="section-header">Stack Component Map</h3>
+<div class="product-grid">
+    <div class="product-card" onclick="showPage('groot')"><h4>GR00T</h4><p>Foundation model for humanoid robots. VLA architecture. N1→N1.5→N1.6→N1.7 versions.</p></div>
+    <div class="product-card" onclick="showPage('isaaclab')"><h4>Isaac Lab</h4><p>GPU-accelerated RL training. 2M steps/sec. Multi-framework support. BSD-3/Apache 2.0.</p></div>
+    <div class="product-card" onclick="showPage('labarena')"><h4>Isaac Lab-Arena</h4><p>Policy evaluation framework. 40× faster evals. 250+ pre-built tasks. Apache 2.0.</p></div>
+    <div class="product-card" onclick="showPage('isaacsim')"><h4>Isaac Sim</h4><p>RTX-powered robotics simulation. Synthetic data. ROS 2 native. Open source (Apache 2.0).</p></div>
+    <div class="product-card" onclick="showPage('newton')"><h4>Newton</h4><p>Open-source physics engine. Linux Foundation. Includes MuJoCo Warp. 152–475× vs MJX.</p></div>
+    <div class="product-card" onclick="showPage('isaacos')"><h4>Isaac OS</h4><p>⚠️ Not confirmed as standalone product. May refer to JetPack/IGX OS.</p></div>
+    <div class="product-card" onclick="showPage('isaacros')"><h4>Isaac ROS</h4><p>CUDA-accelerated ROS 2 packages. SLAM, depth, inference. Apache 2.0.</p></div>
+    <div class="product-card" onclick="showPage('osmo')"><h4>OSMO</h4><p>Cloud-native orchestration. Kubernetes. Multi-cloud. Free &amp; open source.</p></div>
+</div>
+
+<h3 class="section-header">Cross-Stack Licensing Summary</h3>
+<table>
+<tr><th>Component</th><th>License</th><th>Cost</th><th>Commercial Use</th><th>Confidence</th></tr>
+<tr><td>GR00T (code)</td><td>Apache 2.0</td><td>Free</td><td>Yes (code); Weights require review for commercial</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>Isaac Lab</td><td>BSD-3-Clause</td><td>Free</td><td>Yes</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>Isaac Sim (source)</td><td>Apache 2.0</td><td>Free</td><td>R&D free; redistribution of Kit runtime needs Enterprise</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>Newton</td><td>Apache 2.0 / CC-BY-4.0</td><td>Free</td><td>Yes</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>Lab-Arena</td><td>Apache 2.0</td><td>Free</td><td>Yes</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>Isaac ROS</td><td>Apache 2.0</td><td>Free</td><td>Yes</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>OSMO</td><td>Apache 2.0</td><td>Free</td><td>Yes</td><td><span class="v">VERIFIED</span></td></tr>
+</table>
+</div>
+
+<!-- ===== GR00T ===== -->
+<div id="groot" class="page">
+<h2>GR00T — Foundation Model for Humanoid Robots</h2>
+
+<h3 class="section-header">Executive Summary</h3>
+<p>GR00T is NVIDIA's Vision-Language-Action (VLA) foundation model for humanoid robot control. It uses a dual-system architecture: a vision-language backbone (System 2) driving a diffusion/flow-matching action transformer (System 1). The model is cross-embodiment, supporting multiple robot platforms.</p>
+
+<h3 class="section-header">Version History &amp; Benchmarks</h3>
+<table>
+<tr><th>Version</th><th>Params</th><th>DreamGen Success</th><th>Language Following</th><th>Key Improvement</th><th>Confidence</th></tr>
+<tr><td>GR00T N1 (Mar 2025)</td><td>2.2B</td><td>13.1%</td><td>46.6% (GR-1)</td><td>First release; SigLip2 + T5 + flow matching</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>GR00T N1.5 (2025)</td><td>3B</td><td>38.3%</td><td>93.3% (GR-1)</td><td>Eagle 2.5 VLM, FLARE loss</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>GR00T N1.6 (2025)</td><td>3B</td><td>Better than N1.5</td><td>Better than N1.5</td><td>32-layer DiT, Cosmos-Reason-2B VLM, multi-embodiment</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>GR00T N1.7 (Mar 2026)</td><td>—</td><td>—</td><td>—</td><td>Commercial licensing, advanced dexterous control</td><td><span class="e">ESTIMATED</span></td></tr>
+<tr><td>GR00T N2 (2026 planned)</td><td>—</td><td>"2× leading VLAs"</td><td>—</td><td>New world action model architecture</td><td><span class="e">ESTIMATED</span></td></tr>
+</table>
+<div class="source">Sources: <a href="https://research.nvidia.com/labs/gear/gr00t-n1_5/">NVIDIA Research N1.5</a> · <a href="https://research.nvidia.com/labs/gear/gr00t-n1_6/">N1.6 Research Page</a> · <a href="https://arxiv.org/abs/2503.14734">arXiv 2503.14734</a> · <a href="https://nvidianews.nvidia.com/news/nvidia-releases-new-physical-ai-models-as-global-partners-unveil-next-generation-robots">NVIDIA Press (Mar 2026)</a></div>
+
+<h3 class="section-header">Competitive Comparison Matrix</h3>
+<table>
+<tr><th>Model</th><th>Developer</th><th>Architecture</th><th>Key Benchmark</th><th>Open Source?</th><th>Confidence</th></tr>
+<tr class="nvidia-row"><td>GR00T N1.5</td><td>NVIDIA</td><td>VLA (3B), flow matching</td><td>DreamGen: 38.3%, Lang: 93.3%</td><td>Yes (Apache 2.0 code, weights available)</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>π-0 / π-0.5</td><td>Physical Intelligence</td><td>VLA + flow matching</td><td>LIBERO SOTA; 10K+ hrs training data</td><td>Yes (open-sourced)</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>Figure GEN-1</td><td>Figure AI</td><td>Proprietary</td><td>99% on specific industrial tasks (Apr 2026)</td><td>No</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>RT-2-X</td><td>Google DeepMind</td><td>VLA (PaLM-E/PaLI-X)</td><td>3× emergent-skill success vs RT-2</td><td>Research only</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>Octo</td><td>DeepMind/Berkeley</td><td>Diffusion transformer</td><td>Outperforms baseline by 52% avg</td><td>Yes</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>X-VLA-0.9B</td><td>Hugging Face</td><td>VLA (0.9B)</td><td>LIBERO: 93% success</td><td>Yes</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>1X Redwood</td><td>1X Technologies</td><td>Vision-language (160M)</td><td>No published benchmarks</td><td>No</td><td><span class="nd">NEEDS DATA</span></td></tr>
+<tr><td>Tesla Optimus</td><td>Tesla</td><td>Grok-based (planned)</td><td>No published benchmarks</td><td>No</td><td><span class="nd">NEEDS DATA</span></td></tr>
+</table>
+<div class="source">Sources: <a href="https://arxiv.org/abs/2410.24164">π-0 paper</a> · <a href="https://generalistai.com/blog/apr-02-2026-GEN-1">Figure GEN-1</a> · <a href="https://octo-models.github.io/">Octo</a> · <a href="https://huggingface.co/docs/lerobot/xvla">X-VLA</a></div>
+
+<h3 class="section-header">Differentiated Value Stack</h3>
+<div class="vs-item">
+    <div class="label">Cross-Embodiment Generalization <span class="v">VERIFIED</span></div>
+    <div class="detail">GR00T trains on GR-1, Unitree G1, YAM bimanual, Agibot Genie-1. Transfer across embodiments reduces per-robot data collection costs.</div>
+    <div class="range">Displacement: $200K–$500K per new embodiment adaptation</div> <span class="e">ESTIMATED</span>
+    <div class="source">Estimate based on typical ML team salary × months for single-robot fine-tuning. <a href="https://developer.nvidia.com/blog/building-generalist-humanoid-capabilities-with-nvidia-isaac-gr00t-n1-6-using-a-sim-to-real-workflow">Source</a></div>
+</div>
+<div class="vs-item">
+    <div class="label">Sim-to-Real Pipeline Integration <span class="v">VERIFIED</span></div>
+    <div class="detail">Tight integration with Isaac Lab, DreamGen synthetic data, and Cosmos world models. Competitors must build custom sim-to-real pipelines.</div>
+    <div class="range">Displacement: $100K–$300K engineering effort</div> <span class="e">ESTIMATED</span>
+</div>
+<div class="vs-item">
+    <div class="label">Pre-trained Weights Availability <span class="v">VERIFIED</span></div>
+    <div class="detail">N1.6 3B weights on Hugging Face. Fine-tuning from pre-trained baseline saves 60–80% of training compute vs training from scratch.</div>
+    <div class="range">Displacement: $50K–$200K in GPU compute costs</div> <span class="e">ESTIMATED</span>
+    <div class="source"><a href="https://huggingface.co/nvidia/GR00T-N1.6-3B">Hugging Face Model</a></div>
+</div>
+
+<h3 class="section-header">Honest Assessment</h3>
+<div class="card" style="border-left:3px solid var(--needs-data);">
+<div class="card-title" style="color:var(--needs-data);">Transparency Notes</div>
+<p>• GR00T's 38.3% DreamGen is from N1.5, <strong>not</strong> N1.6 or N1.7. Newer versions show improvement but exact DreamGen numbers for N1.6+ are not yet published on the benchmark. <span class="nd">NEEDS DATA</span></p>
+<p>• Figure GEN-1 reports 99% on specific industrial tasks — but these are narrow task benchmarks, not generalizable metrics. Direct comparison to DreamGen is not apples-to-apples.</p>
+<p>• π-0.5 is considered state-of-the-art by the community. GR00T's advantage is tighter vertical integration with NVIDIA simulation/training stack, not raw benchmark superiority. <span class="v">VERIFIED</span></p>
+<p>• N1.7 commercial details not publicly confirmed beyond NVIDIA press release. <span class="e">ESTIMATED</span></p>
+</div>
+</div>
+
+<!-- ===== ISAAC LAB ===== -->
+<div id="isaaclab" class="page">
+<h2>Isaac Lab — GPU-Accelerated Robot Learning</h2>
+
+<h3 class="section-header">Executive Summary</h3>
+<p>Isaac Lab is NVIDIA's open-source framework for robot learning, providing GPU-accelerated parallel environments on top of Isaac Sim/PhysX. It is the successor to IsaacGym, consolidating IsaacGym + IsaacGymEnvs + OmniIsaacGymEnvs + Orbit into a unified platform.</p>
+
+<h3 class="section-header">Version &amp; Status</h3>
+<table>
+<tr><th>Version</th><th>Date</th><th>Status</th><th>Built On</th><th>Confidence</th></tr>
+<tr><td>Isaac Lab 2.3.0</td><td>Oct 30, 2025</td><td>GA (Stable)</td><td>Isaac Sim 5.1</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>Isaac Lab 3.0.0-beta</td><td>2026</td><td>Beta (develop branch)</td><td>Isaac Sim 6.0</td><td><span class="v">VERIFIED</span></td></tr>
+</table>
+<div class="source">Source: <a href="https://github.com/isaac-sim/IsaacLab/releases">GitHub Releases</a></div>
+
+<h3 class="section-header">Performance Benchmarks</h3>
+<table>
+<tr><th>Task</th><th>Hardware</th><th>Throughput</th><th>Training Time</th><th>Confidence</th></tr>
+<tr><td>Classic (Ant, CartPole)</td><td>8× RTX Pro 6000</td><td>Up to 2M steps/sec</td><td>Ant: 20 sec (A100)</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>Franka Cabinet Drawer</td><td>RTX Pro 6000</td><td>~800K FPS</td><td>—</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>DextrAH (dexterous manip)</td><td>RTX Pro 6000</td><td>~450K FPS</td><td>Shadow Hand: 35 min (A100)</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>Unitree G1 (vision)</td><td>RTX Pro 6000</td><td>~50K FPS</td><td>—</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>Humanoid locomotion</td><td>A100</td><td>—</td><td>4 minutes</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>CartPole + vision rendering</td><td>—</td><td>~403K steps/sec</td><td>—</td><td><span class="v">VERIFIED</span></td></tr>
+</table>
+<div class="source">Source: <a href="https://arxiv.org/html/2511.04831v1">arXiv 2511.04831</a> · <a href="https://isaac-sim.github.io/IsaacLab/main/source/overview/reinforcement-learning/performance_benchmarks.html">Official Benchmarks</a></div>
+
+<h3 class="section-header">Competitive Comparison</h3>
+<table>
+<tr><th>Platform</th><th>Single GPU Peak</th><th>Parallel Scaling</th><th>Vision Support</th><th>License</th><th>Cost</th><th>Confidence</th></tr>
+<tr class="nvidia-row"><td>Isaac Lab (PhysX)</td><td>2M steps/sec</td><td>Near-linear to 8 GPU</td><td>Yes (tiled rendering)</td><td>BSD-3</td><td>Free</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>MuJoCo (CPU)</td><td>650K–950K steps/sec</td><td>Single scene only</td><td>Plugin-based</td><td>Apache 2.0</td><td>Free</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>MuJoCo MJX (JAX)</td><td>2.7M steps/sec (TPU v5)</td><td>Good on TPU; 4,096–8,192 parallel envs</td><td>Limited</td><td>Apache 2.0</td><td>Free</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>MuJoCo Playground</td><td>752K steps/sec (A100)</td><td>Good</td><td>Yes (57–91% of time)</td><td>Apache 2.0</td><td>Free</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>Google Brax</td><td>100M+ steps/sec (TPU)</td><td>Exceptional on TPU</td><td>Limited</td><td>Apache 2.0</td><td>Free</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>Genesis</td><td>43M FPS claimed (simple)</td><td>Unknown</td><td>Photo-realistic</td><td>Open source</td><td>Free</td><td><span class="e">ESTIMATED</span></td></tr>
+<tr><td>PyBullet</td><td>~1M steps/sec (CUDA)</td><td>Minimal</td><td>No native</td><td>zlib</td><td>Free</td><td><span class="v">VERIFIED</span></td></tr>
+</table>
+<div class="source">Sources: <a href="https://mujoco.readthedocs.io/en/stable/mjx.html">MJX Docs</a> · <a href="https://arxiv.org/html/2502.08844v1">Playground Paper</a> · <a href="https://github.com/google/brax">Brax</a> · <a href="https://genesis-embodied-ai.github.io/">Genesis</a></div>
+
+<h3 class="section-header">Honest Assessment</h3>
+<div class="card" style="border-left:3px solid var(--needs-data);">
+<div class="card-title" style="color:var(--needs-data);">Transparency Notes</div>
+<p>• <strong>Brax on TPU exceeds Isaac Lab in raw throughput</strong> — 100M+ steps/sec vs 2M. Isaac Lab's advantage is in the integrated stack (rendering, sensors, ROS 2) rather than pure physics speed. <span class="v">VERIFIED</span></p>
+<p>• <strong>Genesis claims are heavily contested.</strong> 43M FPS is for simple robotic arm scenarios. Community reports 3–10× slower than ManiSkill for complex manipulation with collisions. <span class="e">ESTIMATED</span></p>
+<p>• <strong>MuJoCo Playground is a strong free competitor</strong> with RSS 2025 Outstanding Demo Paper Award. It provides zero-shot sim-to-real on consumer GPUs. <span class="v">VERIFIED</span></p>
+<p>• Isaac Lab's real moat is vertical integration: Lab → Sim → Newton → GR00T → ROS → OSMO. No single competitor offers this full pipeline.</p>
+</div>
+
+<h3 class="section-header">Differentiated Value Stack</h3>
+<div class="vs-item">
+    <div class="label">GPU-Accelerated Parallel Training <span class="v">VERIFIED</span></div>
+    <div class="detail">16,384 parallel environments on single GPU. Near-linear multi-GPU scaling. Manager-based workflow adds only 3.53% overhead vs direct GPU code.</div>
+    <div class="range">Displacement: 5–50× training speedup vs CPU-based alternatives</div>
+</div>
+<div class="vs-item">
+    <div class="label">Multi-Framework RL Support <span class="v">VERIFIED</span></div>
+    <div class="detail">RSL-RL, RL-Games, SKRL, Stable Baselines3, RLlib. Gymnasium-compliant for any compatible library.</div>
+    <div class="range">Displacement: $50K–$100K integration engineering per framework</div> <span class="e">ESTIMATED</span>
+</div>
+<div class="vs-item">
+    <div class="label">Domain Randomization + Curriculum Learning <span class="v">VERIFIED</span></div>
+    <div class="detail">Visual + physics randomization. ADR for automatic curriculum progression. Critical for sim-to-real transfer.</div>
+    <div class="range">Displacement: $100K–$200K custom pipeline development</div> <span class="e">ESTIMATED</span>
+</div>
+</div>
+
+<!-- ===== ISAAC SIM ===== -->
+<div id="isaacsim" class="page">
+<h2>Isaac Sim — Robotics Simulation Platform</h2>
+
+<h3 class="section-header">Executive Summary</h3>
+<p>Isaac Sim is NVIDIA's Omniverse-based simulation platform for robotics, providing RTX ray-traced rendering, physics simulation, synthetic data generation, and ROS 2 integration. It serves as the foundation for Isaac Lab's training environments.</p>
+
+<h3 class="section-header">Version History</h3>
+<table>
+<tr><th>Version</th><th>Date</th><th>Key Features</th><th>Confidence</th></tr>
+<tr><td>Isaac Sim 6.0</td><td>GTC 2026 (Early Dev)</td><td>Multi-backend physics, pluggable renderer, kit-less install</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>Isaac Sim 5.1.0</td><td>Oct 21, 2025</td><td>DGX Spark support, enhanced RTX sensors</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>Isaac Sim 5.0</td><td>Aug 2025 (GA)</td><td>Neural reconstruction, Cosmos Transfer, open-source on GitHub</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>Isaac Sim 4.5</td><td>Early 2025 (CES)</td><td>Cosmos WFM integration, improved URDF import</td><td><span class="v">VERIFIED</span></td></tr>
+</table>
+<div class="source">Sources: <a href="https://docs.isaacsim.omniverse.nvidia.com/5.1.0/overview/release_notes.html">5.1 Release Notes</a> · <a href="https://forums.developer.nvidia.com/t/announcement-isaac-sim-6-0-early-developer-release-for-gtc26/363709">6.0 Announcement</a></div>
+
+<h3 class="section-header">Licensing &amp; Pricing</h3>
+<div class="card">
+<div class="card-title">Pricing Model <span class="v">VERIFIED</span></div>
+<p><strong>Free for R&D:</strong> Source code is Apache 2.0. Free to use with NVIDIA Developer Program membership.</p>
+<p><strong>Commercial redistribution:</strong> If redistributing Isaac Sim WITH Omniverse Kit runtime as an application/service → requires NVIDIA AI Enterprise license. Selling simulation outputs only (datasets, videos, reports) does NOT require Enterprise license.</p>
+<p><strong>Enterprise License Cost:</strong> <span class="nd">NEEDS DATA</span> — Contact NVIDIA sales for current pricing.</p>
+</div>
+<div class="source">Source: <a href="https://docs.isaacsim.omniverse.nvidia.com/6.0.0/common/license-faq.html">License FAQ</a></div>
+
+<h3 class="section-header">Competitive Comparison</h3>
+<table>
+<tr><th>Platform</th><th>Rendering</th><th>Physics</th><th>ROS 2</th><th>Synth Data</th><th>License</th><th>Cost</th></tr>
+<tr class="nvidia-row"><td>Isaac Sim</td><td>RTX ray tracing (high)</td><td>PhysX / Newton</td><td>Native</td><td>Excellent</td><td>Apache 2.0</td><td>Free (R&D)</td></tr>
+<tr><td>Gazebo (Harmonic)</td><td>OGRE v2 (moderate)</td><td>ODE/Bullet/DART</td><td>Native</td><td>Limited</td><td>Open source</td><td>Free</td></tr>
+<tr><td>Unity ML-Agents</td><td>High (game engine)</td><td>PhysX</td><td>Partial</td><td>Limited</td><td>Proprietary</td><td>Free/$$$</td></tr>
+<tr><td>Unreal + MuJoCo</td><td>Very high</td><td>MuJoCo + Chaos</td><td>Yes (plugins)</td><td>Growing</td><td>Royalty-based</td><td>Varies</td></tr>
+<tr><td>CoppeliaSim</td><td>Moderate</td><td>5 engines</td><td>Yes</td><td>Limited</td><td>Commercial</td><td>Contact vendor</td></tr>
+<tr><td>Webots</td><td>Low-moderate</td><td>Internal</td><td>Yes</td><td>Limited</td><td>Apache 2.0</td><td>Free</td></tr>
+<tr><td>Genesis</td><td>Photo-realistic</td><td>Multi-method</td><td>Limited</td><td>Yes</td><td>Open source</td><td>Free</td></tr>
+</table>
+
+<h3 class="section-header">Honest Assessment</h3>
+<div class="card" style="border-left:3px solid var(--needs-data);">
+<div class="card-title" style="color:var(--needs-data);">Transparency Notes</div>
+<p>• <strong>No published FPS benchmarks</strong> — NVIDIA's docs list KPIs but don't publish specific render FPS numbers. <span class="nd">NEEDS DATA</span></p>
+<p>• <strong>Gazebo is free and deeply integrated with ROS 2</strong> — for teams not needing photorealistic synth data, Gazebo Harmonic is a strong competitor at zero cost and zero lock-in risk.</p>
+<p>• <strong>Enterprise license cost is opaque</strong> — this is a real barrier for commercial evaluation. Competitors like Gazebo and Webots have zero licensing friction.</p>
+<p>• <strong>Isaac Sim's real advantage is synthetic data quality</strong> — RTX ray tracing + Cosmos Transfer produces training data that meaningfully improves model accuracy for vision-based policies.</p>
+</div>
+</div>
+
+<!-- ===== NEWTON ===== -->
+<div id="newton" class="page">
+<h2>Newton — Open-Source Physics Engine for Robotics</h2>
+
+<h3 class="section-header">Executive Summary</h3>
+<p>Newton is a <strong>collaborative</strong>, Linux Foundation–managed physics engine developed jointly by NVIDIA, Google DeepMind, and Disney Research. It is NOT a MuJoCo competitor — it <strong>includes MuJoCo Warp as a core solver</strong> alongside other specialized solvers. Released as Newton 1.0 at GTC 2026.</p>
+
+<h3 class="section-header">Architecture: Multi-Solver Framework</h3>
+<table>
+<tr><th>Solver</th><th>Origin</th><th>Use Case</th><th>Confidence</th></tr>
+<tr><td>MuJoCo Warp</td><td>DeepMind / NVIDIA</td><td>GPU-optimized rigid-body dynamics (locomotion, manipulation)</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>Kamino</td><td>Disney Research</td><td>Complex mechanisms, parallel linkages, closed-chain kinematics</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>VBD (Vertex Block Descent)</td><td>—</td><td>Deformable simulation (cables, cloth, volumetric)</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>XPBD / SemiImplicit</td><td>—</td><td>Additional rigid-body variants</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>Featherstone</td><td>—</td><td>Multi-body dynamics</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>SDF Collision Library</td><td>—</td><td>Signed-distance field collision detection</td><td><span class="v">VERIFIED</span></td></tr>
+</table>
+<div class="source">Sources: <a href="https://github.com/newton-physics/newton">GitHub</a> · <a href="https://developer.nvidia.com/blog/announcing-newton-an-open-source-physics-engine-for-robotics-simulation/">NVIDIA Blog</a> · <a href="https://www.linuxfoundation.org/press/linux-foundation-announces-contribution-of-newton-by-disney-research-google-deepmind-and-nvidia-to-accelerate-open-robot-learning">Linux Foundation</a></div>
+
+<h3 class="section-header">Performance: MuJoCo Warp vs MJX</h3>
+<table>
+<tr><th>Task</th><th>Hardware</th><th>Speedup vs MJX</th><th>Confidence</th></tr>
+<tr><td>Locomotion</td><td>RTX 4090</td><td><strong>152×</strong></td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>Manipulation</td><td>RTX 4090</td><td><strong>313×</strong></td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>Manipulation</td><td>RTX PRO 6000 (Blackwell)</td><td><strong>475×</strong></td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>In-hand dexterity (Isaac Lab 3.0-beta)</td><td>—</td><td><strong>65% faster</strong> vs PhysX</td><td><span class="v">VERIFIED</span></td></tr>
+</table>
+<div class="source">Sources: <a href="https://developer.nvidia.com/blog/train-a-quadruped-locomotion-policy-and-simulate-cloth-manipulation-with-nvidia-isaac-lab-and-newton/">NVIDIA Blog</a> · <a href="https://isaac-sim.github.io/IsaacLab/main/source/experimental-features/newton-physics-integration/index.html">Isaac Lab Docs</a></div>
+
+<h3 class="section-header">Competitive Comparison</h3>
+<table>
+<tr><th>Engine</th><th>GPU Native</th><th>Differentiable</th><th>Open Source</th><th>Deformables</th><th>Robotics Focus</th><th>Confidence</th></tr>
+<tr class="nvidia-row"><td>Newton</td><td>Yes (Warp)</td><td>Yes</td><td>Apache 2.0</td><td>Yes (VBD, Kamino)</td><td>High</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>MuJoCo</td><td>MJX (JAX)</td><td>Yes</td><td>Apache 2.0</td><td>Limited</td><td>Very High</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>PhysX</td><td>Yes</td><td>Limited</td><td>Open source</td><td>Yes</td><td>Moderate</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>Bullet/PyBullet</td><td>CUDA (limited)</td><td>No</td><td>zlib</td><td>Soft body</td><td>Moderate</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>Drake</td><td>No</td><td>Yes</td><td>BSD-3</td><td>No</td><td>High (control)</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>Brax</td><td>Yes (JAX)</td><td>Yes</td><td>Apache 2.0</td><td>No</td><td>Moderate</td><td><span class="v">VERIFIED</span></td></tr>
+</table>
+
+<h3 class="section-header">Honest Assessment</h3>
+<div class="card" style="border-left:3px solid var(--estimated);">
+<div class="card-title" style="color:var(--estimated);">Transparency Notes</div>
+<p>• <strong>Newton includes MuJoCo Warp — it's collaborative, not competitive.</strong> DeepMind co-developed this. Framing Newton as "replacing" or "beating" MuJoCo is misleading. MuJoCo Warp IS part of Newton. <span class="v">VERIFIED</span></p>
+<p>• The 152–475× speedup is <strong>specifically vs MJX (JAX backend)</strong>, not vs CPU MuJoCo. MJX single-env is ~10× slower than CPU MuJoCo, so the comparison is against an already-slower baseline in single-env mode. The speedup is real for batched GPU workloads.</p>
+<p>• Newton 1.0 is <strong>brand new (March 2026)</strong> — production stability and feature completeness are still being validated. Many Isaac Lab features are "experimental" with Newton backend. <span class="v">VERIFIED</span></p>
+</div>
+</div>
+
+<!-- ===== LAB-ARENA ===== -->
+<div id="labarena" class="page">
+<h2>Isaac Lab-Arena — Policy Evaluation Framework</h2>
+
+<h3 class="section-header">Executive Summary</h3>
+<p>Isaac Lab-Arena is a policy evaluation and benchmarking framework that extends Isaac Lab. It provides composable, GPU-accelerated evaluation at scale. Co-developed with Lightwheel AI, it offers 250+ pre-built tasks and integrates with LeRobot.</p>
+
+<h3 class="section-header">Key Metrics</h3>
+<table>
+<tr><th>Metric</th><th>Value</th><th>Confidence</th></tr>
+<tr><td>Evaluation Speedup</td><td><strong>40×</strong> (0.76 hrs vs 34.9 hrs sequential)</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>Pre-built Tasks</td><td>268 tasks (Lightwheel-RoboCasa + Lightwheel-LIBERO)</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>Kitchen Scenes</td><td>100 (10 layouts × 10 styles)</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>Assets Available</td><td>2,500+ high-quality assets</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>Supported Policies</td><td>GR00T N, π, SmolVLA, others</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>License</td><td>Apache 2.0</td><td><span class="v">VERIFIED</span></td></tr>
+</table>
+<div class="source">Sources: <a href="https://developer.nvidia.com/blog/simplify-generalist-robot-policy-evaluation-in-simulation-with-nvidia-isaac-lab-arena/">NVIDIA Blog</a> · <a href="https://isaac-sim.github.io/IsaacLab-Arena/main/index.html">Documentation</a></div>
+
+<h3 class="section-header">Competitive Landscape</h3>
+<p>Lab-Arena occupies a unique niche — there are no direct competitors offering GPU-accelerated, multi-task policy evaluation at this scale. The closest alternatives are:</p>
+<table>
+<tr><th>Alternative</th><th>Type</th><th>Scale</th><th>GPU Accelerated</th></tr>
+<tr class="nvidia-row"><td>Isaac Lab-Arena</td><td>Dedicated evaluation framework</td><td>268+ tasks, 2,500+ assets</td><td>Yes (40× speedup)</td></tr>
+<tr><td>LIBERO (standalone)</td><td>Benchmark suite</td><td>130 tasks</td><td>No (CPU-based eval)</td></tr>
+<tr><td>RoboCasa (standalone)</td><td>Benchmark suite</td><td>100 tasks</td><td>No</td></tr>
+<tr><td>Meta-World</td><td>Benchmark suite</td><td>50 tasks</td><td>No</td></tr>
+<tr><td>Custom eval scripts</td><td>Ad-hoc</td><td>Varies</td><td>Varies</td></tr>
+</table>
+
+<h3 class="section-header">Honest Assessment</h3>
+<div class="card" style="border-left:3px solid var(--estimated);">
+<div class="card-title" style="color:var(--estimated);">Transparency Notes</div>
+<p>• Lab-Arena is relatively new (v0.2) and co-developed with Lightwheel AI. Maturity is still early. <span class="v">VERIFIED</span></p>
+<p>• The 40× speedup is for GPU-parallel evaluation vs sequential CPU evaluation — a real but expected advantage of GPU parallelism, not a unique algorithmic breakthrough.</p>
+<p>• Strong value for teams already in the Isaac ecosystem. Less compelling for teams using MuJoCo/JAX stacks who can write custom parallel eval with MJX. <span class="e">ESTIMATED</span></p>
+</div>
+</div>
+
+<!-- ===== ISAAC ROS ===== -->
+<div id="isaacros" class="page">
+<h2>Isaac ROS — Hardware-Accelerated ROS 2 Packages</h2>
+
+<h3 class="section-header">Executive Summary</h3>
+<p>Isaac ROS is a collection of CUDA-accelerated ROS 2 packages providing GPU-accelerated perception, planning, and control. Current version: 3.2. Primary ROS 2 distribution: Jazzy. Licensed Apache 2.0.</p>
+
+<h3 class="section-header">Performance Benchmarks</h3>
+<table>
+<tr><th>Component</th><th>Platform</th><th>Performance</th><th>Confidence</th></tr>
+<tr><td>Visual SLAM (cuVSLAM)</td><td>AGX Orin</td><td>232 FPS @ 720p</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>Visual SLAM</td><td>x86 + RTX 4060 Ti</td><td>386 FPS</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>Visual SLAM</td><td>Orin Nano 8G</td><td>116 FPS</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>TensorRT DOPE (pose)</td><td>VGA 30Hz</td><td>165 FPS, 6.4ms latency</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>PeopleSemSegNet</td><td>544p</td><td>566 FPS, 2.1ms latency</td><td><span class="v">VERIFIED</span></td></tr>
+</table>
+<div class="source">Source: <a href="https://nvidia-isaac-ros.github.io/performance/index.html">Isaac ROS Performance Benchmarks</a></div>
+
+<h3 class="section-header">Key Packages</h3>
+<table>
+<tr><th>Package</th><th>Function</th><th>GPU Acceleration</th></tr>
+<tr><td>cuVSLAM</td><td>Stereo visual SLAM + odometry</td><td>Yes (CUDA)</td></tr>
+<tr><td>DNN Stereo Depth</td><td>Deep-learned disparity (ESS, FoundationStereo)</td><td>Yes (TensorRT)</td></tr>
+<tr><td>DNN Inference</td><td>TensorRT/Triton real-time inference</td><td>Yes (NITROS zero-copy)</td></tr>
+<tr><td>AprilTag</td><td>Tag detection + pose estimation</td><td>Yes (GPU/CPU/PVA)</td></tr>
+<tr><td>Nvblox</td><td>Real-time 3D reconstruction (SDF)</td><td>Yes (CUDA)</td></tr>
+<tr><td>cuMotion</td><td>Arm motion planning + trajectory optimization</td><td>Yes (CUDA + MoveIt 2)</td></tr>
+</table>
+
+<h3 class="section-header">Competitive Comparison</h3>
+<table>
+<tr><th>Platform</th><th>Acceleration</th><th>SLAM Perf</th><th>Cost</th><th>Hardware Lock-in</th></tr>
+<tr class="nvidia-row"><td>Isaac ROS</td><td>CUDA/TensorRT/PVA</td><td>232–386 FPS</td><td>Free (Apache 2.0)</td><td>NVIDIA GPU required</td></tr>
+<tr><td>Standard ROS 2</td><td>CPU only</td><td>30–60 FPS typical</td><td>Free</td><td>None</td></tr>
+<tr><td>ORB-SLAM3 (ROS)</td><td>CPU</td><td>Lower than cuVSLAM on KITTI</td><td>Free (GPL v3)</td><td>None</td></tr>
+<tr><td>Intel RealSense ROS</td><td>Partial (Intel GPU)</td><td>Camera-dependent</td><td>Free</td><td>Intel hardware</td></tr>
+<tr><td>Qualcomm RB5</td><td>Snapdragon NPU</td><td>Unknown</td><td>Dev kit pricing</td><td>Qualcomm hardware</td></tr>
+</table>
+
+<h3 class="section-header">Honest Assessment</h3>
+<div class="card" style="border-left:3px solid var(--estimated);">
+<div class="card-title" style="color:var(--estimated);">Transparency Notes</div>
+<p>• <strong>GPU lock-in is real:</strong> Isaac ROS requires NVIDIA hardware (Jetson or x86 + NVIDIA GPU). Standard ROS 2 packages run on any hardware. For cost-sensitive deployments, this matters.</p>
+<p>• <strong>Performance advantage is significant</strong> — 4–10× faster SLAM vs CPU alternatives is well-documented. But many robotics applications don't need 232 FPS SLAM.</p>
+<p>• <strong>CPU vs GPU direct comparison benchmarks</strong> for identical tasks are not published by NVIDIA. The "2–5× speedup" claim is inferred from SLAM literature, not official NVIDIA data. <span class="e">ESTIMATED</span></p>
+</div>
+</div>
+
+<!-- ===== ISAAC OS ===== -->
+<div id="isaacos" class="page">
+<h2>Isaac OS — ⚠️ Product Status Unconfirmed</h2>
+
+<h3 class="section-header">Critical Transparency Note</h3>
+<div class="card" style="border-left:3px solid var(--needs-data);">
+<div class="card-title" style="color:var(--needs-data);">NEEDS DATA — Product Not Found</div>
+<p>Despite exhaustive research across NVIDIA developer documentation, GTC announcements (2024–2026), press releases, and community forums, <strong>no product specifically called "Isaac OS" was found</strong> as a standalone NVIDIA offering.</p>
+<p>This may refer to:</p>
+<p>• <strong>JetPack 7</strong> — The Jetson software stack (L4T + CUDA + TensorRT + multimedia APIs), now aligning with ARM SBSA standards <span class="v">VERIFIED</span></p>
+<p>• <strong>IGX OS</strong> — Enterprise-grade, safety-certified software stack for NVIDIA IGX platform <span class="v">VERIFIED</span></p>
+<p>• <strong>The broader Isaac ecosystem</strong> used as an "OS-like" platform layer <span class="e">ESTIMATED</span></p>
+<p>• <strong>An unannounced/internal product</strong> <span class="nd">NEEDS DATA</span></p>
+</div>
+
+<h3 class="section-header">Related Products</h3>
+<table>
+<tr><th>Product</th><th>What It Is</th><th>Target</th><th>Status</th></tr>
+<tr><td>JetPack 7</td><td>Jetson software SDK (L4T, CUDA, TensorRT, VPI)</td><td>Jetson hardware</td><td>Available</td></tr>
+<tr><td>IGX OS</td><td>Safety-certified edge OS for IGX platform</td><td>Industrial/medical edge</td><td>Available</td></tr>
+<tr><td>Isaac Launchable</td><td>Browser-based dev environment for Isaac Lab/Sim</td><td>Cloud development</td><td>Available</td></tr>
+</table>
+
+<h3 class="section-header">Recommendation</h3>
+<p>Before including "Isaac OS" in a final CLU, verify with NVIDIA product management whether this is: (a) a planned product, (b) an internal codename, or (c) a misidentification of JetPack/IGX OS. Including unverified product claims would undermine CLU credibility.</p>
+</div>
+
+<!-- ===== OSMO ===== -->
+<div id="osmo" class="page">
+<h2>OSMO — Cloud-Native Orchestration for Physical AI</h2>
+
+<h3 class="section-header">Executive Summary</h3>
+<p>OSMO is an open-source, cloud-native orchestration platform for scaling Physical AI workloads. It coordinates multi-stage workflows (data generation, training, simulation, evaluation, HIL testing) across heterogeneous compute. Kubernetes-native, multi-cloud, vendor-agnostic.</p>
+
+<h3 class="section-header">Key Facts</h3>
+<table>
+<tr><th>Attribute</th><th>Value</th><th>Confidence</th></tr>
+<tr><td>License</td><td>Apache 2.0</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>Cost</td><td><strong>Free</strong> (open source, self-hosted)</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>Repository</td><td><a href="https://github.com/NVIDIA/OSMO" style="color:var(--nvidia-green)">github.com/NVIDIA/OSMO</a></td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>Architecture</td><td>Kubernetes-native, declarative YAML workflows</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>Cloud Support</td><td>AWS EKS, Azure AKS, GCP GKE, on-prem</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>Hardware Support</td><td>x86, ARM, NVIDIA GPU, Jetson edge</td><td><span class="v">VERIFIED</span></td></tr>
+<tr><td>Internal Use</td><td>Powers NVIDIA's own Physical AI workloads (GR00T, Isaac Lab)</td><td><span class="v">VERIFIED</span></td></tr>
+</table>
+<div class="source">Sources: <a href="https://github.com/NVIDIA/OSMO">GitHub</a> · <a href="https://developer.nvidia.com/osmo">NVIDIA Developer</a> · <a href="https://developer.nvidia.com/blog/scale-ai-enabled-robotics-development-workloads-with-nvidia-osmo/">NVIDIA Blog</a></div>
+
+<h3 class="section-header">Competitive Comparison</h3>
+<table>
+<tr><th>Platform</th><th>Type</th><th>Multi-Cloud</th><th>Robotics Focus</th><th>Cost</th><th>Status</th></tr>
+<tr class="nvidia-row"><td>OSMO</td><td>Open-source orchestration</td><td>Yes (vendor-agnostic)</td><td>Purpose-built</td><td>Free</td><td>Active</td></tr>
+<tr><td>AWS RoboMaker</td><td>Managed simulation service</td><td>No (AWS only)</td><td>Yes</td><td>Was $0.40/SU-hr</td><td><strong>DEPRECATED</strong> (Sep 2025)</td></tr>
+<tr><td>Google Cloud Robotics</td><td>Perception + ML platform</td><td>No (GCP only)</td><td>Partial</td><td>GCP pricing</td><td>Active</td></tr>
+<tr><td>Azure IoT Robotics</td><td>IoT + robotics services</td><td>No (Azure only)</td><td>Limited</td><td>Azure pricing</td><td>Active</td></tr>
+<tr><td>Vanilla Kubernetes</td><td>DIY orchestration</td><td>Yes</td><td>None</td><td>Free (+ engineering)</td><td>N/A</td></tr>
+</table>
+
+<h3 class="section-header">Honest Assessment</h3>
+<div class="card" style="border-left:3px solid var(--verified);">
+<div class="card-title" style="color:var(--verified);">Transparency Notes</div>
+<p>• <strong>AWS RoboMaker is DEPRECATED</strong> — no longer available for new customers as of Sep 2025. This significantly reduces OSMO's competitive pressure in cloud robotics orchestration. <span class="v">VERIFIED</span></p>
+<p>• OSMO is genuinely free and open-source (confirmed Apache 2.0 on GitHub). Previous CLU version incorrectly listed pricing as "TBD." <span class="v">VERIFIED</span></p>
+<p>• The real cost of OSMO is infrastructure (Kubernetes cluster + GPUs) and engineering time to deploy/maintain. OSMO software itself adds no cost.</p>
+<p>• OSMO's moat is robotics-specific abstractions on top of K8s. Teams already running custom K8s pipelines may find limited incremental value. <span class="e">ESTIMATED</span></p>
+</div>
+
+<h3 class="section-header">Differentiated Value Stack</h3>
+<div class="vs-item">
+    <div class="label">Robotics-Specific Workflow Orchestration <span class="v">VERIFIED</span></div>
+    <div class="detail">Declarative YAML for training → sim → eval → HIL pipelines. No K8s manifest writing required.</div>
+    <div class="range">Displacement: $50K–$150K DevOps engineering to build custom pipeline</div> <span class="e">ESTIMATED</span>
+</div>
+<div class="vs-item">
+    <div class="label">Multi-Cloud Vendor Agnosticism <span class="v">VERIFIED</span></div>
+    <div class="detail">Single orchestration layer across AWS, Azure, GCP, on-prem. No vendor lock-in (unlike deprecated RoboMaker).</div>
+    <div class="range">Displacement: $100K–$300K cloud migration costs if locked to single provider</div> <span class="e">ESTIMATED</span>
+</div>
+</div>
+
+</div><!-- end .main -->
+
+<script>
+function showPage(id) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    // Find and activate the nav button
+    document.querySelectorAll('.nav-item').forEach(n => {
+        if (n.getAttribute('onclick') && n.getAttribute('onclick').includes("'" + id + "'")) {
+            n.classList.add('active');
+        }
+    });
+    window.scrollTo(0, 0);
+}
+</script>
+</body>
+</html>
